@@ -1,0 +1,11 @@
+# Folia iOS migration design
+
+User target: all Folia features, Spotify included, TrollStore on iPhone 14 Pro / iOS 16.1.1, light/dark mode and landscape. User confirmed existing backend APIs are compatible with upstream Folia. Actual URLs, Spotify backend protocol and test accounts have not been supplied.
+
+Architecture: retain upstream React app and all providers; bundle web assets inside Capacitor 6.2.1; add Swift capabilities for persistent directory import, playback audio session, document export and native backend configuration. Use existing NetEase/QQ/KuGou HTTP contracts. Desktop-only provider transports gain an explicit remote operation envelope rather than pretending Electron is present. Spotify remains the original provider implementation, with its IPC operation names transported over HTTPS when a matching gateway exists. A normal Spotify Web API endpoint alone is not this gateway and cannot be assumed to provide full audio.
+
+Constraints: no hardcoded backend credentials, no uploads of local music, no private entitlements, no claim of complete migration without end-to-end evidence. Build native arm64 with minimum OS 16.0 and ad-hoc signing for TrollStore. Keep original settings storage and Omni boundaries. Native failures must be visible and configuration must remain editable after first launch.
+
+Alternatives: web-only wrapping fails local-directory access and desktop providers; a full Swift rewrite duplicates the entire UI and lyric engine; bundled upstream frontend plus native bridges reuses the existing behaviors. The user instructed proceeding with full migration, so preserve every upstream subsystem as the migration baseline and explicitly track capabilities still requiring implementation/testing.
+
+Acceptance requires a macOS xcodebuild device build, IPA inspection, real iOS 16 playback/import/rotation/theme tests, backend login/search/playlist/playback for every source, and individual desktop capability replacements. A buildable native foundation is not a completed full migration. Desktop Node mod execution, desktop wallpaper/window behavior, audio/AI native engines and full FFmpeg export require separate native implementations or explicit feature-equivalent designs; do not silently label them supported.

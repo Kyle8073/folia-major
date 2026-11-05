@@ -7,6 +7,9 @@ import {
 } from '../../../src/services/appDatabase';
 import {
     clearCache,
+    saveDirHandles,
+    getDirHandles,
+    deleteDirHandle,
     getCacheEntriesByPrefix,
     getCacheKeysByPrefix,
     getFromCache,
@@ -25,6 +28,15 @@ describe('db Dexie compatibility facade', () => {
 
     afterEach(async () => {
         await appDatabase.delete();
+    });
+
+    it('serializes concurrent removal of directory registrations', async () => {
+        await saveDirHandles({
+            A: { kind: 'directory', name: 'A' } as FileSystemDirectoryHandle,
+            B: { kind: 'directory', name: 'B' } as FileSystemDirectoryHandle,
+        });
+        await Promise.all([deleteDirHandle('A'), deleteDirHandle('B')]);
+        expect(await getDirHandles()).toEqual({});
     });
 
     it('routes cache values and migrates legacy user entries atomically', async () => {

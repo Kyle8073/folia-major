@@ -1,3 +1,5 @@
+import { getIosApiBase } from '../../ios/backendConfig';
+import { requestRemoteOperation } from '../../ios/remoteOperation';
 import { OnlineProviderError } from '../../../types/onlineMusic';
 import type { ProviderErrorCode } from '../../../types/onlineMusic';
 
@@ -28,7 +30,7 @@ export interface SpotifyWireMadePlaylist { uri: string }
 export interface SpotifyWireLyrics { timed: boolean; lines: Array<{ startMs: number; words: string }> }
 
 export const getSpotifyTransportAvailability = () => (
-    typeof window !== 'undefined' && typeof window.electron?.spotifyRequest === 'function'
+    (Boolean(getIosApiBase('spotify')) || (typeof window !== 'undefined' && typeof window.electron?.spotifyRequest === 'function'))
         ? { configured: true } as const
         : { configured: false, reason: 'runtime-unavailable' } as const
 );
@@ -40,7 +42,9 @@ export async function requestSpotify<T = unknown>(operation: SpotifyOperation, p
     const named = operation === 'query' ? `${operation} ${String(params.name)}` : operation;
     const startedAt = Date.now();
     let result: SpotifyBridgeResult;
-    try { result = await window.electron!.spotifyRequest(operation, params); }
+    try { result = await (getIosApiBase('spotify')
+        ? requestRemoteOperation('spotify', operation, params) as Promise<SpotifyBridgeResult>
+        : window.electron!.spotifyRequest(operation, params)); }
     catch {
         console.warn(`[Spotify] ${named} did not reach the desktop app`);
         throw new OnlineProviderError('network', 'Spotify desktop request failed', 'spotify');

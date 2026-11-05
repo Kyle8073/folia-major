@@ -37,8 +37,8 @@ export const resolveWashEndpoints = (
 };
 
 const drawCoverCropped = (
-    context: OffscreenCanvasRenderingContext2D,
-    image: ImageBitmap,
+    context: OffscreenCanvasRenderingContext2D | CanvasRenderingContext2D,
+    image: ImageBitmap | HTMLImageElement,
     width: number,
     height: number,
 ) => {
@@ -93,7 +93,7 @@ export const resolveWashColor = (
 
 // Applies the stable canvas-only color treatment so Safari never needs CSS filters for Monet backgrounds.
 const applyBackgroundPostProcessing = (
-    context: OffscreenCanvasRenderingContext2D,
+    context: OffscreenCanvasRenderingContext2D | CanvasRenderingContext2D,
     width: number,
     height: number,
     theme: MonetBackgroundColors,
@@ -153,7 +153,7 @@ const applyBackgroundPostProcessing = (
 };
 
 const paintMonetOverlay = (
-    context: OffscreenCanvasRenderingContext2D,
+    context: OffscreenCanvasRenderingContext2D | CanvasRenderingContext2D,
     width: number,
     height: number,
     theme: MonetBackgroundColors,
@@ -196,8 +196,8 @@ const paintMonetOverlay = (
  * the canvas blur, or null where the page blurs the picture with CSS instead.
  */
 export const paintMonetBackground = (
-    context: OffscreenCanvasRenderingContext2D,
-    image: ImageBitmap,
+    context: OffscreenCanvasRenderingContext2D | CanvasRenderingContext2D,
+    image: ImageBitmap | HTMLImageElement,
     colors: MonetBackgroundColors,
     tuning: MonetBackgroundTuning,
     blurPx: number | null,

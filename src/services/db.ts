@@ -1,3 +1,5 @@
+import { serializeDirectoryHandles, hydrateDirectoryHandles, NativeDirectoryHandle } from './ios/nativeFileHandles';
+import { nativeFilePort } from './ios/nativeBridge';
 import type { LocalLibrarySnapshot, LocalSong } from '../types';
 import type { MigrationResult } from '../utils/lyrics/renderHints';
 import { appDatabase } from './appDatabase';
@@ -240,6 +242,7 @@ export const deleteLocalSongs = async (ids: string[]): Promise<void> => {
 
 export const clearAllData = async (): Promise<void> => {
   try {
+    const nativeRoots = Object.values(await getDirHandles()).filter(handle => handle instanceof NativeDirectoryHandle);
     if (hasElectronAudioCacheBridge()) await window.electron!.clearAudioCache();
     await clearCoverAssets();
     await cancelLocalCoverAssetMigration();
@@ -247,24 +250,35 @@ export const clearAllData = async (): Promise<void> => {
     resetLocalCoverAssetRuntime();
     await appDatabase.delete();
     await appDatabase.open();
+    await Promise.all(nativeRoots.map(handle => handle.release()));
   } catch (error) {
     console.error('Failed to clear all data', error);
   }
 };
 
 export const saveDirHandles = async (handles: Record<string, FileSystemDirectoryHandle>): Promise<void> => {
-  await saveToCache('local_dir_handles', handles);
+  await putCacheEntry('local_dir_handles', serializeDirectoryHandles(handles));
 };
 
 export const getDirHandles = async (): Promise<Record<string, FileSystemDirectoryHandle>> => (
-  (await getFromCache<Record<string, FileSystemDirectoryHandle>>('local_dir_handles')) || {}
+  hydrateDirectoryHandles((await getFromCache<Parameters<typeof hydrateDirectoryHandles>[0]>('local_dir_handles')) || {}, nativeFilePort)
 );
 
-export const deleteDirHandle = async (rootFolderName: string): Promise<void> => {
-  const handles = await getDirHandles();
-  if (!(rootFolderName in handles)) return;
-  delete handles[rootFolderName];
-  await saveDirHandles(handles);
+let directoryHandleDeletion: Promise<void> = Promise.resolve();
+
+export const deleteDirHandle = (rootFolderName: string): Promise<void> => {
+  const removal = directoryHandleDeletion.then(async () => {
+    const handles = await getDirHandles();
+    if (!(rootFolderName in handles)) return;
+    const removed = handles[rootFolderName];
+    delete handles[rootFolderName];
+    await saveDirHandles(handles);
+    if (removed instanceof NativeDirectoryHandle && !Object.values(handles).some(handle => handle instanceof NativeDirectoryHandle && handle.root === removed.root)) {
+      await removed.release();
+    }
+  });
+  directoryHandleDeletion = removal.catch(() => undefined);
+  return removal;
 };
 
 const getLocalSnapshotCacheKey = (rootFolderName: string) => `local_snapshot_${rootFolderName}`;

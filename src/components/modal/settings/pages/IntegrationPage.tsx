@@ -1,3 +1,4 @@
+import IosBackendRows from './integration/IosBackendRows';
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { usePlaybackReportReady } from '../../../../services/onlineMusic/playbackReportGate';
@@ -39,6 +40,7 @@ const IntegrationPage: React.FC = () => {
     return (
         <>
             <Group def={SERVICES}>
+                <IosBackendRows />
                 <NavidromeRows />
                 <SyncServerRows />
                 {isElectron && (

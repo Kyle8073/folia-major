@@ -218,6 +218,7 @@ export default async function viteConfig(_config: ConfigEnv): Promise<UserConfig
       include: ['music-metadata'],
     },
     build: {
+      ...(process.env.FOLIA_IOS === 'true' ? { target: 'safari16', cssTarget: 'safari16' } : {}),
       rollupOptions: {
         input: {
           main: 'index.html',
@@ -278,7 +279,7 @@ export default async function viteConfig(_config: ConfigEnv): Promise<UserConfig
       icuFoliaDataPlugin(),
       nebbiaStrokesPlugin(),
       react(),
-      VitePWA({
+      process.env.FOLIA_IOS !== 'true' && VitePWA({
         registerType: 'autoUpdate',
         includeAssets: ['icon.svg'],
         devOptions: {

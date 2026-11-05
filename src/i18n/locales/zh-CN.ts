@@ -1,6 +1,7 @@
 
 
 export default {
+  "iosPort": {"backends": "音乐后端接口", "backendHint": "设置各平台 API 地址及 Spotify 操作网关。", "configurationFailed": "无法打开设置", "configure": "配置"},
   "scratchpad": {
     "title": "速记簿",
     "count_one": "{{count}} 首",

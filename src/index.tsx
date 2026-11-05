@@ -1,3 +1,5 @@
+import { startupFailureMessage } from './services/ios/startupMessage';
+import { installIosRuntime } from './services/ios/installIosRuntime';
 import { Buffer } from 'buffer';
 import { installGlobalVisualizerFrameRateLimiter } from './utils/frameRateLimiter';
 import { installConsoleLogCapture } from './utils/consoleLogBuffer';
@@ -22,6 +24,10 @@ installMemorySampleFeed();
 // if (import.meta.env.DEV) installCoverSizeAudit();
 installGlobalVisualizerFrameRateLimiter();
 
-void import('./bootstrap');
+void installIosRuntime().then(() => import('./bootstrap')).catch(error => {
+    console.error('[FoliaIOS] Application startup failed', error);
+    const splash = document.getElementById('app-splash');
+    if (splash) splash.textContent = startupFailureMessage(localStorage.getItem('folia_app_language') || navigator.language);
+});
 // window.__foliaDev and the ?skipStartup / ?mockSong launch flags (src/dev/devLaunchFlags.ts).
 if (import.meta.env.DEV) void import('./dev/devTools');

@@ -1,3 +1,4 @@
+import { installIosAppearance } from './services/ios/installIosAppearance';
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import './i18n/config';
@@ -43,6 +44,7 @@ const FIRST_SCREEN_MOD_WAIT_MS = 1500;
 // here, for every surface this bundle mounts, rather than inside App so the remote-control and OBS
 // roots are covered too and App.tsx does not grow. See utils/nativeDragGuard.ts.
 installNativeDragGuard();
+installIosAppearance();
 
 const rootElement = document.getElementById('root');
 if (!rootElement) {

@@ -300,6 +300,16 @@ describe('localMusicService', () => {
         });
     });
 
+    it('preserves same-named empty directory registrations when importing a different folder', async () => {
+        vi.mocked(getDirHandles).mockResolvedValue({ Music: new FakeDirectoryHandle('Music', [], 'empty-root') as unknown as FileSystemDirectoryHandle });
+        vi.mocked((window as any).showDirectoryPicker).mockResolvedValue(createLibraryHandle('new-root'));
+        await importFolder();
+        expect(saveDirHandles).toHaveBeenCalledWith(expect.objectContaining({
+            Music: expect.anything(),
+            'Music (2)': expect.anything(),
+        }));
+    });
+
     it('rescans the existing root when the same folder is imported again', async () => {
         const persistedHandle = createLibraryHandle();
         const selectedHandle = createLibraryHandle();

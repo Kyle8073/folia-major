@@ -1,0 +1,16 @@
+{
+  "appId": "top.izuna.foliamajor.ios",
+  "appName": "Folia",
+  "webDir": "dist",
+  "ios": {
+    "contentInset": "automatic",
+    "preferredContentMode": "mobile",
+    "backgroundColor": "#09090b",
+    "allowsLinkPreview": false
+  },
+  "plugins": {
+    "CapacitorHttp": {
+      "enabled": true
+    }
+  }
+}

@@ -1,0 +1,42 @@
+name: Folia iOS TrollStore
+on:
+  workflow_dispatch:
+  push:
+    branches: [ios/trollstore-port]
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: macos-15
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Install pinned dependencies
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Typecheck and transport tests
+        run: |
+          npm run typecheck
+          npm run test:unit -- test/unit/ios test/unit/onlineMusic/qqTransport.test.ts test/unit/onlineMusic/kugouTransport.test.ts test/unit/onlineMusic/bodianTransport.test.ts test/unit/ytm/ytmTransport.test.ts
+      - name: Bundle web application for iOS 16
+        run: npm run build:ios:web
+      - name: Prepare native project and pods
+        run: npm run prepare:ios
+      - name: Build iPhone arm64 application
+        run: |
+          xcodebuild -version
+          xcodebuild -workspace ios/App/App.xcworkspace -scheme App -configuration Release -sdk iphoneos -destination 'generic/platform=iOS' -derivedDataPath ios/DerivedData ARCHS=arm64 CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO build
+      - name: Sign and package for TrollStore
+        run: npm run package:ios
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Folia-iOS-TrollStore
+          path: |
+            ios/output/Folia-iOS-TrollStore.ipa
+            ios/output/Folia-iOS-TrollStore.ipa.sha256
+          if-no-files-found: error

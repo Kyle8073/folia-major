@@ -1,3 +1,5 @@
+import { getIosApiBase } from '../../ios/backendConfig';
+import { requestRemoteOperation } from '../../ios/remoteOperation';
 import { OnlineProviderError } from '../../../types/onlineMusic';
 import type { ProviderErrorCode } from '../../../types/onlineMusic';
 
@@ -71,7 +73,7 @@ export type YtmWireWebLoginState =
     | { state: 'error'; message: string; code?: ProviderErrorCode; reason?: string };
 
 export const getYtmTransportAvailability = () => (
-    typeof window !== 'undefined' && typeof window.electron?.ytmRequest === 'function'
+    (Boolean(getIosApiBase('ytm')) || (typeof window !== 'undefined' && typeof window.electron?.ytmRequest === 'function'))
         ? { configured: true } as const
         : { configured: false, reason: 'runtime-unavailable' } as const
 );
@@ -82,7 +84,9 @@ export async function requestYtm<T = unknown>(operation: YtmOperation, params: Y
     }
     const startedAt = Date.now();
     let result: YtmBridgeResult;
-    try { result = await window.electron!.ytmRequest(operation, params); }
+    try { result = await (getIosApiBase('ytm')
+        ? requestRemoteOperation('ytm', operation, params) as Promise<YtmBridgeResult>
+        : window.electron!.ytmRequest(operation, params)); }
     catch {
         console.warn(`[Ytm] ${operation} did not reach the desktop app`);
         throw new OnlineProviderError('network', 'YouTube Music desktop request failed', 'ytm');

@@ -212,7 +212,19 @@ const buildMonetBackgroundUrl = async ({
         return null;
     }
 
-    const image = await createImageBitmap(await loadImage(sourceUrl));
+    const loadedImage = await loadImage(sourceUrl);
+    if (typeof window !== 'undefined' && window.__FOLIA_IOS__) {
+        let workerCanvasAvailable = false;
+        try { workerCanvasAvailable = typeof OffscreenCanvas !== 'undefined' && Boolean(new OffscreenCanvas(1, 1).getContext('2d')); }
+        catch { /* Older WebKit can expose an OffscreenCanvas without a usable 2D context. */ }
+        if (!workerCanvasAvailable) {
+            const { paintMonetOnMainThread } = await import('./monetMainThread');
+            const picture = await paintMonetOnMainThread(loadedImage, theme, tuning,
+                checkCanvasFilterSupport() ? clamp(tuning.backgroundBlurPx, 0, 60) : null, wanted);
+            return picture ? URL.createObjectURL(picture) : picture;
+        }
+    }
+    const image = await createImageBitmap(loadedImage);
     const picture = await paintOffThread({
         image,
         colors: {

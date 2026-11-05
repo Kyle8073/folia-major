@@ -1,3 +1,5 @@
+import { getIosApiBase } from '../../ios/backendConfig';
+import { requestRemoteOperation } from '../../ios/remoteOperation';
 import { OnlineProviderError } from '../../../types/onlineMusic';
 import type { ProviderErrorCode } from '../../../types/onlineMusic';
 import type { QishuiOperation, QishuiParams, QishuiBridgeResult } from 'qishui-music-api';
@@ -21,14 +23,16 @@ export class QishuiRequestError extends OnlineProviderError {
     }
 }
 export const getQishuiAvailability = () => (
-    typeof window !== 'undefined' && typeof window.electron?.qishuiRequest === 'function'
+    (Boolean(getIosApiBase('qishui')) || (typeof window !== 'undefined' && typeof window.electron?.qishuiRequest === 'function'))
         ? { configured: true } as const : { configured: false, reason: 'runtime-unavailable' } as const
 );
 export async function requestQishui<T = unknown>(operation: QishuiOperation, params: QishuiParams = {}): Promise<T> {
     if (operation === 'login_qr_key') lastFailure = null;
     if (!getQishuiAvailability().configured) throw new OnlineProviderError('unavailable', QISHUI_NEEDS_DESKTOP, 'qishui');
     let result: QishuiBridgeResult;
-    try { result = await window.electron!.qishuiRequest(operation, params); }
+    try { result = await (getIosApiBase('qishui')
+        ? requestRemoteOperation('qishui', operation, params) as Promise<QishuiBridgeResult>
+        : window.electron!.qishuiRequest(operation, params)); }
     catch (error) { throw new OnlineProviderError('network', QISHUI_BRIDGE_FAILED, 'qishui', error); }
     if (!result.ok) {
         const stage = STAGES.find(stage => stage === result.error.stage) ?? null;

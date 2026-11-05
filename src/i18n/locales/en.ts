@@ -1,6 +1,7 @@
 
 
 export default {
+  "iosPort": {"backends": "Music backends", "backendHint": "Configure your API servers, including the Spotify operation gateway.", "configurationFailed": "Could not open settings", "configure": "Configure"},
   "scratchpad": {
     "title": "Scratchpad",
     "count_one": "{{count}} song",

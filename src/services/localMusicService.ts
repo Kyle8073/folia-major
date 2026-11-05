@@ -1,3 +1,5 @@
+import { FoliaNative, isNativeIos, nativeFilePort } from './ios/nativeBridge';
+import { NativeDirectoryHandle, NativeFileHandle } from './ios/nativeFileHandles';
 import { LocalSong, LyricData, LocalLibrarySnapshot, LocalLibrarySnapshotFile, LocalLibrarySnapshotNode, type SongResult } from '../types';
 import { saveLocalSong, saveLocalSongs, deleteLocalSong as dbDeleteLocalSong, deleteLocalSongs as dbDeleteLocalSongs, saveDirHandles, getDirHandles, deleteDirHandle, getLocalSongs, getLocalLibrarySnapshot, saveLocalLibrarySnapshot, deleteLocalLibrarySnapshot } from './db';
 import { getLocalPlaylists, saveLocalPlaylists } from './localPlaylistService';
@@ -47,7 +49,7 @@ interface ImportPreparationMetrics {
 
 interface FileEntryForImport {
     handle: FileSystemFileHandle;
-    file: File;
+    file?: File;
     folderName: string;
     relativePath: string;
     // A sidecar lyric file of this track was added or modified on disk since the last scan.
@@ -67,7 +69,7 @@ interface SnapshotTraversalResult {
 
 interface SnapshotTraversalFile {
     handle: FileSystemFileHandle;
-    file: File;
+    file?: File;
 }
 
 interface ImportDiffPlan {
@@ -179,6 +181,16 @@ async function getImportDirectoryHandle(expectedRootName?: string): Promise<File
 
     const availability = getLocalLibraryAvailability();
     if (!availability.supported) throw new Error(`Local library unavailable: ${availability.reason}`);
+
+    if (isNativeIos()) {
+        try {
+            const selected = await FoliaNative.pickDirectory();
+            return new NativeDirectoryHandle(selected.root, '', selected.name, nativeFilePort) as unknown as FileSystemDirectoryHandle;
+        } catch (error) {
+            if ((error as { code?: string })?.code === 'CANCELLED') return null;
+            throw error;
+        }
+    }
 
     // @ts-ignore - showDirectoryPicker is not in all TypeScript definitions
     return await window.showDirectoryPicker();
@@ -533,16 +545,17 @@ async function buildSnapshotTree(
         const fileHandle = entry as FileSystemFileHandle;
 
         try {
-            const file = await fileHandle.getFile();
-            const relativePath = `${currentPath}/${file.name}`;
-            const signature = buildFileSignature(relativePath, file.size, file.lastModified);
+            const file = kind === 'audio' && fileHandle instanceof NativeFileHandle ? undefined : await fileHandle.getFile();
+            const metadata = file ?? await (fileHandle as unknown as NativeFileHandle).getMetadata();
+            const relativePath = `${currentPath}/${metadata.name}`;
+            const signature = buildFileSignature(relativePath, metadata.size, metadata.lastModified);
 
             files.push({
-                name: file.name,
+                name: metadata.name,
                 relativePath,
                 kind,
-                size: file.size,
-                lastModified: file.lastModified,
+                size: metadata.size,
+                lastModified: metadata.lastModified,
                 signature
             });
             filesByPath.set(relativePath, { handle: fileHandle, file });
@@ -718,12 +731,12 @@ async function collectImportDiffPlan(
             if (snapshotFile.kind === 'translationLyric') {
                 const existingTranslationLyric = translationLyricCandidates.get(baseName);
                 if (!existingTranslationLyric || priority < existingTranslationLyric.priority) {
-                    translationLyricCandidates.set(baseName, { file: traversedFile.file, priority });
+                    translationLyricCandidates.set(baseName, { file: traversedFile.file ?? await traversedFile.handle.getFile(), priority });
                 }
             } else {
                 const existingLyric = lyricCandidates.get(baseName);
                 if (!existingLyric || priority < existingLyric.priority) {
-                    lyricCandidates.set(baseName, { file: traversedFile.file, priority, format });
+                    lyricCandidates.set(baseName, { file: traversedFile.file ?? await traversedFile.handle.getFile(), priority, format });
                 }
             }
             continue;
@@ -735,7 +748,7 @@ async function collectImportDiffPlan(
             const existingCover = coverCandidates.get(folderKey);
 
             if (!existingCover || priority < existingCover.priority) {
-                coverCandidates.set(folderKey, { file: traversedFile.file, priority });
+                coverCandidates.set(folderKey, { file: traversedFile.file ?? await traversedFile.handle.getFile(), priority });
             }
             continue;
         }
@@ -793,8 +806,9 @@ async function buildImportedSong(
     existingSong?: LocalSong
 ): Promise<{ song: LocalSong | null; metrics: ImportPreparationMetrics; }> {
     const fileHandle = entry.handle;
-    const file = entry.file;
-    const getFileMs = 0;
+    const getFileStartedAt = performance.now();
+    const file = entry.file ?? await fileHandle.getFile();
+    const getFileMs = performance.now() - getFileStartedAt;
 
     if (!isAudioFile(file)) {
         return {
@@ -1100,7 +1114,7 @@ async function hydrateImportedSongsInBackground(rootFolderName: string, songs: L
     };
 
     try {
-        const workerCount = Math.min(IMPORT_CONCURRENCY, songs.length);
+        const workerCount = Math.min(isNativeIos() ? 1 : IMPORT_CONCURRENCY, songs.length);
         await Promise.all(Array.from({ length: workerCount }, () => worker()));
         while (pendingBatch.length > 0) {
             await flushBatch(true);
@@ -1126,7 +1140,15 @@ export async function importFolder(expectedRootName?: string): Promise<LocalSong
     try {
         const dirHandle = await getImportDirectoryHandle(expectedRootName);
         if (!dirHandle) return [];
-        return await runLocalFolderMutation(() => importFolderContents(dirHandle, expectedRootName));
+        try {
+            return await runLocalFolderMutation(() => importFolderContents(dirHandle, expectedRootName));
+        } catch (error) {
+            if (!expectedRootName && dirHandle instanceof NativeDirectoryHandle) {
+                const registered = Object.values(await getDirHandles()).some(handle => handle instanceof NativeDirectoryHandle && handle.root === dirHandle.root);
+                if (!registered) await dirHandle.release();
+            }
+            throw error;
+        }
     } catch (error) {
         if ((error as Error).name === 'AbortError') return [];
         throw error;
@@ -1167,6 +1189,8 @@ async function importFolderContents(dirHandle: FileSystemDirectoryHandle, expect
                     .map(name => name!.split('/')[0])
             );
 
+            Object.keys(await getDirHandles()).forEach(name => existingRootFolders.add(name));
+
             let originalRootName = rootFolderName;
             let counter = 1;
             while (existingRootFolders.has(rootFolderName)) {
@@ -1199,6 +1223,7 @@ async function importFolderContents(dirHandle: FileSystemDirectoryHandle, expect
             console.log(`[LocalMusic] Saved directory handle for ${rootFolderName}`);
         } catch (e) {
             console.error('[LocalMusic] Failed to save directory handle:', e);
+            if (dirHandle instanceof NativeDirectoryHandle) throw e;
         }
 
         const lyricIndexStartedAt = performance.now();
@@ -1209,7 +1234,7 @@ async function importFolderContents(dirHandle: FileSystemDirectoryHandle, expect
         const metadataStartedAt = performance.now();
         const existingSongsByPath = new Map(existingRootSongs.map(song => [song.filePath, song]));
         const coverBlobCache = new Map<string, Promise<PreparedLocalCoverBlob | undefined>>();
-        const processedSongs = await mapWithConcurrency(diffPlan.changedEntries, IMPORT_CONCURRENCY, async (entry) => {
+        const processedSongs = await mapWithConcurrency(diffPlan.changedEntries, isNativeIos() ? 1 : IMPORT_CONCURRENCY, async (entry) => {
             try {
                 return await buildImportedSong(
                     entry,
@@ -1783,7 +1808,7 @@ export async function deleteSongsByIds(songIds: string[]): Promise<void> {
     console.log(`[LocalMusic] Deleted ${uniqueSongIds.length} songs by ID`);
 }
 
-// Removes an imported root from the app, including empty roots, without deleting disk files.
+// Removes a root without deleting original source files; native app-owned music copies are released.
 export function removeImportedRoot(rootFolderName: string): Promise<void> {
     return runLocalFolderMutation(() => removeImportedRootContents(rootFolderName));
 }

@@ -1,6 +1,7 @@
 
 
 export default {
+  "iosPort": {"backends": "Backend musik", "backendHint": "Atur server API Anda, termasuk gateway operasi Spotify.", "configurationFailed": "Pengaturan tidak dapat dibuka", "configure": "Atur"},
   "scratchpad": {
     "title": "Buku catatan",
     "count_one": "{{count}} lagu",
