@@ -53,3 +53,7 @@ npm run package:ios
 ```
 
 The last three steps require macOS/Xcode/CocoaPods. Workflow: `.github/workflows/ios-trollstore.yml`; output: `ios/output/Folia-iOS-TrollStore.ipa`. Installation trust must be checked with TrollStore on the target phone.
+
+## Checkpoint validation
+
+2026-11-05: local TypeScript check passed; 191 focused unit tests passed; production iOS web bundle built. Two independent source-review rounds completed and confirmed findings fixed. Second-round corrections were not sent through a third review. Real iPhone and backend testing remain outstanding. GitHub Actions enabled by the repository owner. Native build 41977837664 succeeded, including ad-hoc signature verification and IPA artifact upload (code commit b248ea3ff25f6986ac1ef264af9bfba1c711db46).
