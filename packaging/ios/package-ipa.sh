@@ -8,7 +8,7 @@ if [[ ! -x "$APP_PATH/App" ]]; then
     echo 'A compiled iOS device app is required.' >&2
     exit 1
 fi
-xcrun lipo -verify_arch arm64 "$APP_PATH/App"
+xcrun lipo "$APP_PATH/App" -verify_arch arm64
 mkdir -p "$OUTPUT_DIR"
 STAGE_DIR="$(mktemp -d)"
 trap 'rm -rf "$STAGE_DIR"' EXIT
